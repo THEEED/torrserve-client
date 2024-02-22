@@ -1,0 +1,38 @@
+{
+  "name": "torrserve_downloader",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.4",
+    "express": "^4.18.2",
+    "lowdb": "3.0.0",
+    "nanoid": "^5.0.5",
+    "progress": "^2.0.3",
+    "promisify": "^0.0.3",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  },
+  "pkg": {
+    "targets": [
+      "node16-win-arm64"
+    ],
+    "assets": [
+      "public/**/*",
+      ".env"
+    ],
+    "scripts": [
+      "api.js",
+      "downloadManager.js",
+      "downloader.js"
+    ]
+  }
+}

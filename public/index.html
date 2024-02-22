@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Список торрентов</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div id="app" class="container">
+        <h1 class="my-5">TorrServe Downloader</h1>
+
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <a class="nav-link active" href="#torrents" data-toggle="tab">Торренты</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#downloads" data-toggle="tab">Загрузки</a>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="torrents">
+                <table class="table mt-3">
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Общий вес</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody v-if="torrents.length">
+                        <tr v-for="torrent in torrents" :key="torrent.hash">
+                            <td>
+                                <div>{{ torrent.title }}</div>
+                                <div v-if="torrent.showFiles" v-for="file in torrent.files" :key="file.id">{{ file.path
+                                    }} - {{ (file.length / 1024 / 1024).toFixed(2) }} MB</div>
+                                <button v-if="torrent.data" class="btn btn-primary btn-sm"
+                                    @click="torrent.showFiles = !torrent.showFiles">
+                                    {{ torrent.showFiles ? 'Скрыть файлы' : 'Показать файлы' }}
+                                </button>
+                            </td>
+                            <td>{{ (torrent.torrent_size / 1024 / 1024 / 1024).toFixed(2) }} GB</td>
+                            <td>
+                                <button v-if="torrent.data" @click="startDownload(torrent.hash)" class="    btn btn-primary
+                                    btn-sm">
+                                    Скачать
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="tab-pane fade" id="downloads">
+                <table v-if="downloads.length" class="table mt-3">
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Статус</th>
+                            <th>Дата начала</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="download in downloads" :key="download.id">
+                            <td>
+                                <div>{{ keepAfterLastSlash(download.torrentInfo.title) }}</div>
+                                <div v-for="(file, index) in download.files" :key="index" class="file-line">
+                                    {{ file.id }} / {{ file.status }} {{ file.status !== 'downloaded' ? getFileProgress(file.downloadedBytes, file.length) : ''}} {{ getSpeed(file.downloadSpeed, file.status)}}/ {{keepAfterLastSlash(file.path)}}
+                                    <button class="file-line__restart btn btn-danger btn-sm" v-if="file.status === 'downloaded'" @click="resetFileStatus(download.id, file.id)">
+                                        Рестарт
+                                    </button>
+                                </div>
+                            </td>
+                            <td>{{ download.status }}</td>
+                            <td>{{ new Date(download.createdAt).toLocaleString() }}</td>
+                            <td> <button @click="deleteDownload(download.id)" class="btn btn-danger
+                                btn-sm">
+                                    Удалить
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .file-line {
+            display: flex;
+        }
+
+        .file-line__restart {
+            display: none;
+            margin-left: auto;
+        }
+
+        .file-line:hover {
+            background: lightgray;
+        }
+
+        .file-line:hover .file-line__restart {
+            display: inline-block;
+        }
+    </style>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                torrents: [],
+                downloads: []
+            },
+            methods: {
+                getSpeed(downloadSpeed, fileStatus) {
+                    if (!downloadSpeed || fileStatus === 'downloaded') return;
+
+                    return `/ ${(downloadSpeed / 1024).toFixed(2)} Mb s `
+                },
+                getFileProgress(downloaded, total){
+                    if(!downloaded || !total)  return;
+                    const progress = (downloaded / total) * 100;
+                    return `/ ${progress.toFixed(0)}%`
+
+                },
+                keepAfterLastSlash(str) {
+                    const indexOfLastSlash = str.lastIndexOf('/');
+                    if (indexOfLastSlash !== -1) {
+                        return str.substring(indexOfLastSlash + 1);
+                    }
+                    return str;
+                },
+                async startDownload(hash) {
+                    await fetch(`/start-download/${hash}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            alert(data.message);
+                        })
+                        .catch(error => console.error('Ошибка при начале загрузки:', error));
+                    await this.fetchDownloads();
+                },
+                async deleteDownload(downloadId) {
+                    await fetch(`/delete-download/${downloadId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            alert(data.message);
+                        })
+                        .catch(error => console.error('Ошибка при начале загрузки:', error));
+                    await this.fetchDownloads();
+                },
+                async resetFileStatus(downloadId, fileId) {
+                    await fetch(` /reset-file-status/${downloadId}/${fileId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            alert(data.message);
+                        })
+                        .catch(error => console.error('Ошибка при начале загрузки:', error));
+                    await this.fetchDownloads();
+                },
+                fetchTorrents() {
+                    fetch('/torrents')
+                        .then(response => response.json())
+                        .then(data => {
+                            this.torrents = data.map(torrent => ({
+                                ...torrent,
+                                files: torrent.data ? JSON.parse(torrent.data).TorrServer?.Files || [] : [],
+                                showFiles: false
+                            }));
+                        });
+                },
+                fetchDownloads() {
+                    fetch('/downloads')
+                        .then(response => response.json())
+                        .then(data => {
+                            this.downloads = data;
+                        })
+                        .catch(error => console.error('Ошибка при получении списка загрузок:', error));
+                }
+            },
+            async mounted() {
+                await this.fetchDownloads();
+                await this.fetchTorrents();
+                setInterval(async () => {
+                    await this.fetchDownloads();
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+
+</html>
